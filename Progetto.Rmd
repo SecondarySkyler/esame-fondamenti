@@ -1,0 +1,221 @@
+---
+title: "Progetto Data Science"
+author: "Cristian Murtas"
+date: "8/14/2021"
+output: beamer_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Analisi sul cambiamento climatico
+
+Negli ultimi anni si sente sempre di più parlare del cambiamento climatico e del surriscaldamento globale, non solo, anche gli avvenimenti ambientali, come per esempio precipitazioni e temperature, parlano da sole.
+
+Lo scopo di questa analisi è quello di fornire un quadro generale sulla questione.
+In particolare andremo a cercare una risposta alle seguenti domande:
+
+...
+
+
+
+
+```{r, echo = FALSE}
+# Importiamo le librerie
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(rgdal)
+library(leaflet)
+library(maps)
+library(mapproj)
+
+```
+
+
+
+```{r, echo = TRUE}
+# Importiamo i datasets
+global_temp_city <- read_csv("./datasets/GlobalLandTemperaturesByCity.csv")
+co2_emission <- read_csv("./datasets/co2_emission.csv")
+global_mean_temp <- read_csv("./datasets/GLB.Ts+dSST.csv")
+```
+
+
+
+```{r, echo=FALSE}
+# Pulizia del dataset da valori NA
+global_temp_city = na.omit(global_temp_city)
+```
+
+
+```{r, echo=FALSE}
+# Divido la data in Year, Month, Day
+global_temp_city = global_temp_city %>%
+  separate(col = dt, into = c("Year", "Month", "Day"), convert = TRUE)
+global_temp_city <- na.omit(global_temp_city)
+
+```
+
+```{r, echo=FALSE}
+# Ricavo due tibble relativi alle temperature del 1850 e a quelle del 2013
+gt_sep %>%
+  select(Year, AverageTemperature, Country) %>%
+  group_by(Year, Country) %>%
+  summarise(value = mean(AverageTemperature)) -> global_temp
+
+
+
+```
+
+```{r, echo=FALSE}
+# Grafico interattivo per mostrare l'andamento delle temperature medie dal 1880 al 2021
+global_mean_temp %>%
+  group_by(Year) %>%
+  summarise_at(vars(-Year), funs(mean(., na.rm = TRUE)))
+
+```
+
+
+
+
+```{r, echo=FALSE}
+# Creo due tibble per le temperature nel 1850 e nel 2013
+global_temp %>%
+  filter(Year == 1850) -> temp_1850
+temp_1850 <- temp_1850[,2:3]
+
+global_temp %>%
+  filter(Year == 2013) -> temp_2013
+temp_2013 <- temp_2013[,2:3]
+
+temp_1850
+temp_2013
+```
+
+
+
+```{r, echo=FALSE}
+library(broom)
+world_json <- readOGR("map/custom.geo.json")
+world_json = tidy(world_json, region = "name_long")
+
+world_json$id[world_json$id == "Russian Federation"] <- "Russia"
+world_json$id[world_json$id == "Democratic Republic of the Congo"] <- "Congo"
+
+world_json %>%
+  filter(id == "South Sudan")
+
+# Unisco i dataset della mappa e delle temperature relative al 1850
+world_json_1850 = world_json %>%
+  left_join(., temp_1850, by = c("id" = "Country"))
+
+# Unisco i dataset della mappa e delle temperature relative al 2013
+world_json_2013 = world_json %>%
+  left_join(., temp_2013, by = c("id" = "Country"))
+
+map_temp_1850 <- ggplot() +
+  ggtitle("Mappa mondiale delle temperature nel 1850") + 
+  geom_polygon(data = world_json_1850, aes(fill = value, x = long, y = lat, group = group)) +
+  theme_void() +
+  coord_map()
+
+
+map_temp_2013 <- ggplot() +
+  ggtitle("Mappa mondiale delle temperature nel 2013") + 
+  geom_polygon(data = world_json_2013, aes(fill = value, x = long, y = lat, group = group)) +
+  theme_void() +
+  coord_map()
+
+map_temp_1850
+map_temp_2013
+
+```
+
+
+
+
+```{r, echo=FALSE}
+# Shiny app per visualizzare l'andamento temporale delle emissioni di co2 a livello mondiale
+ui <- fluidPage(
+  titlePanel("Emissioni Annuali di CO2, 1750-2019"),
+  
+  sidebarLayout(
+    sidebarPanel(
+      helpText("Emissioni di CO2 a livello Mondiale
+               dal 1750 a oggi"),
+      
+      sliderInput(inputId = "year",
+                  label = "Anno",
+                  min = 1750,
+                  max = 2019,
+                  value = 1750,
+                  step = 25,
+                  sep = "",
+                  animate = TRUE)
+    ),
+    mainPanel(
+      plotOutput("emissions")
+    )
+  )
+  
+)
+
+server <- function(input, output, session) {
+  
+  output$emissions <- renderPlot({
+    
+    # filtro il dataset in base all'anno selezionato con lo slider
+    co2_emission %>%
+      filter(Entity == "World", Year <= input$year) %>%
+      ggplot(aes(x = Year, y = `Annual CO2 emissions (tonnes )`)) +
+      geom_line() + 
+      labs(x = "Anno", y = "Emissioni annue di CO2 (tonnellate)") +
+      scale_y_continuous(labels = scales::comma) +
+      #theme(axis.text.x = element_text(size = 32)) + non funziona
+      theme_minimal()
+  })
+}
+
+shinyApp(ui, server)
+```
+
+
+
+
+```{r, echo=FALSE}
+#Plot dei dati sulla Co2 per ogni stato
+co2_emission %>%
+  filter(Year > 2000, Entity != "Europe (other)") %>%
+  filter(Entity != "World", Entity != "Americas (other)", Entity != "Middle East") %>%
+  filter(Entity != "Germany", Entity != "United Kingdom", Entity != "Japan", Entity != "South Korea", Entity != "Italy") %>%
+  group_by(Year) %>%
+  slice_max(order_by = `Annual CO2 emissions (tonnes )`, n = 10) -> top10_co2_emissions
+
+
+
+
+co2_emission %>% anti_join(top10_co2_emissions, by = 'Entity')  -> use_for_anti_join
+
+co2_emission %>% anti_join(use_for_anti_join) -> clean_data_co2_emission
+
+clean_data_co2_emission %>% 
+  ggplot(aes(Year, `Annual CO2 emissions (tonnes )`, group = Entity, colour = Entity, fill = Entity)) +
+  geom_ribbon(aes(ymin = 0, ymax = `Annual CO2 emissions (tonnes )`), alpha = 0.3) +
+  labs(x = "Anno", y = "Emissioni annue di CO2 (tonnellate)") +
+  scale_y_continuous(labels = scales::comma)
+  theme_minimal()
+
+```
+
+
+
+
+
+
+
+
+
+
