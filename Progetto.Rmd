@@ -2,7 +2,10 @@
 title: "Progetto Data Science"
 author: "Cristian Murtas"
 date: "8/14/2021"
-output: beamer_presentation
+output:
+  slidy_presentation: default
+  beamer_presentation: default
+  ioslides_presentation: default
 ---
 
 ```{r setup, include=FALSE}
@@ -16,206 +19,308 @@ Negli ultimi anni si sente sempre di più parlare del cambiamento climatico e de
 Lo scopo di questa analisi è quello di fornire un quadro generale sulla questione.
 In particolare andremo a cercare una risposta alle seguenti domande:
 
+- Come sono cambiate le temperature medie della superficie terrestre nel corso degli anni?
+- Com' è cambiata l'emissione di CO2 nel corso degli anni?
+- Qual è la regione che emette più anidride carbonica? E come è cambiato l'andamento nel corso degli anni?
+- C'è correlazione tra un'elevata emissione e il numero della popolazione?
 ...
 
 
 
 
-```{r, echo = FALSE}
+```{r, echo = FALSE, results='hide', librerie}
 # Importiamo le librerie
 library(readr)
 library(dplyr)
 library(ggplot2)
 library(tidyr)
-library(rgdal)
-library(leaflet)
+library(broom)
 library(maps)
 library(mapproj)
-
+library(shiny)
+library(ggthemes)
+library(sf)
+library(gganimate)
+library(gifski)
+library(plotly)
 ```
 
 
 
-```{r, echo = TRUE}
+```{r, echo = FALSE, dataset}
 # Importiamo i datasets
-global_temp_city <- read_csv("./datasets/GlobalLandTemperaturesByCity.csv")
-co2_emission <- read_csv("./datasets/co2_emission.csv")
-global_mean_temp <- read_csv("./datasets/GLB.Ts+dSST.csv")
+global_temp_by_country <- read_csv("./datasets/GlobalLandTemperaturesByCountry.csv")
+iso3_code <- read_csv("datasets/countries_codes_and_coordinates.csv")
+
+state_code <- read_csv("datasets/state_code.csv") # forse sara' da togliere
+
+global_temperature <- read_csv("datasets/GlobalTemperatures.csv")
+co2_emission <- read_csv("./datasets/annual-co-emissions-by-region.csv")
+co2_emission_percapita <- read_csv("datasets/co-emissions-per-capita.csv")
 ```
 
 
 
-```{r, echo=FALSE}
-# Pulizia del dataset da valori NA
-global_temp_city = na.omit(global_temp_city)
-```
-
-
-```{r, echo=FALSE}
+```{r, echo=FALSE, conversioneData}
 # Divido la data in Year, Month, Day
-global_temp_city = global_temp_city %>%
+global_temp_by_country = global_temp_by_country %>%
+  drop_na() %>%
+  separate(col = dt, into = c("Year", "Month", "Day"), convert = TRUE) %>%
+  filter(Year > 1849)
+  
+
+global_temperature = global_temperature %>%
   separate(col = dt, into = c("Year", "Month", "Day"), convert = TRUE)
-global_temp_city <- na.omit(global_temp_city)
-
 ```
 
-```{r, echo=FALSE}
-# Ricavo due tibble relativi alle temperature del 1850 e a quelle del 2013
-gt_sep %>%
-  select(Year, AverageTemperature, Country) %>%
-  group_by(Year, Country) %>%
-  summarise(value = mean(AverageTemperature)) -> global_temp
 
+# Vediamo come è cambiato l'andamento della temperature della superficie terrestre
 
+```{r, echo=FALSE, grafico-temperatura}
 
-```
-
-```{r, echo=FALSE}
-# Grafico interattivo per mostrare l'andamento delle temperature medie dal 1880 al 2021
-global_mean_temp %>%
+global_mean_temperature = global_temperature %>%
+  drop_na() %>%
   group_by(Year) %>%
-  summarise_at(vars(-Year), funs(mean(., na.rm = TRUE)))
+  summarize(LandAverageTemperatureByYear = mean(LandAverageTemperature)) %>%
+  ggplot(aes(x = Year, y = LandAverageTemperatureByYear)) +
+  geom_line(color = "gold1") +
+  labs(title = "Andamento annuale della temperatura",
+       subtitle = "1850 - 2015",
+       y = "Temperatura Media (Celsius °C)",
+       caption = "Source: Kaggle") +
+  theme_minimal() +
+  theme(text = element_text(family = "DM Sans Medium"),
+        axis.title.x = element_blank(),
+        legend.position = "bottom") +
+  scale_x_continuous(limits = c(1850, 2015)) +
+  geom_point(color = "goldenrod3")
+  
+
+global_mean_temperature.animation = global_mean_temperature +
+  transition_reveal(Year)
+
+#animate(global_mean_temperature.animation, height = 500, width = 800, fps = 30, end_pause = 60, res = 100, duration = 10, renderer = gifski_renderer("test.gif"))
+
+```
+
+# Grazie a questa mappa interattiva è possibile analizzare il cambiamento delle temperature superficiali del nostro pianeta
+```{r, echo=FALSE, dati-mappa-temperatura}
+# Vado a effettuare la media annuale per ogni stato, al fine di ridurre la dimensionalità del dataset.
+global_temp_by_country = global_temp_by_country %>%
+  group_by(Country, Year) %>%
+  summarize(`Media Annuale` = mean(AverageTemperature)) %>%
+  drop_na()
+
+# Unisco il dataset delle temperature al dataset dei codici iso-3, al fine di mappare correttamente gli stati  
+gt <- global_temp_by_country %>% 
+  left_join(., iso3_code, by = "Country") %>%
+  select(Year, `Media Annuale`, Country, `Alpha-3 code`) %>%
+  drop_na()
+  
+```
+
+```{r, echo=FALSE, mappa-temperatura}
+
+fig <- plot_geo(gt, frame = ~Year) %>%
+  add_trace(locations = ~`Alpha-3 code`,
+            z = ~`Media Annuale`,
+            zmin = min(gt$`Media Annuale`),
+            zmax = max(gt$`Media Annuale`),
+            color = ~`Media Annuale`,
+            colorscale = "Hot_r") %>%
+  layout(title = "Temperature Medie Annuali\n1850 - 2013",
+         geo = list(
+           showocean = TRUE,
+           oceancolor = rgb(0,1,1)
+         )) %>%
+  animation_opts(20) %>%
+  colorbar(title = "Media", ticksuffix = " °C") %>%
+  config(displayModeBar = FALSE)
+
+fig
+```
+
+
+
+# Emissioni annuali di CO2
+
+Diamo un'occhiata a come sono cambiate le emissioni di CO2 nel corso degli anni
+
+```{r, echo=FALSE, emissioni-annuali}
+world_co2_emission = co2_emission %>%
+  filter(Entity == "World") %>%
+  ggplot(aes(x = Year, y = `Annual CO2 emissions`)) +
+  geom_line(size = 1, color = "darkolivegreen2") + 
+  labs(title = "Emissioni Annuali CO2", 
+       subtitle = "1750 - 2019",
+       y = "Emissioni annue di CO2 (tonnellate)",
+       caption = "Source: Global Carbon Project") +
+  scale_y_continuous(labels = scales::comma) +
+  theme_minimal() +
+  geom_point(color = "forestgreen") +
+  theme(text = element_text(family = "DM Sans Medium"),
+        axis.title.x = element_blank()
+  )
+
+world_co2_emission.animation = world_co2_emission +
+  transition_reveal(Year) +
+  view_follow()
+
+#animate(world_co2_emission.animation, height = 500, width = 800, fps = 30, end_pause = 60, res = 100, duration = 10, renderer = gifski_renderer("world_co2.gif"))
 
 ```
 
 
 
+# Emissioni annuali di CO2 delle regioni mondiali
 
-```{r, echo=FALSE}
-# Creo due tibble per le temperature nel 1850 e nel 2013
-global_temp %>%
-  filter(Year == 1850) -> temp_1850
-temp_1850 <- temp_1850[,2:3]
+```{r, echo=FALSE, emissioni-regioni}
+# Creo un filtro (grazie a un array) con le regioni mondiali
+country_filter <- c("International transport", "Oceania", "Asia (excl. China & India)", "China", "India", "Africa", "South America", "North America (excl. USA)", "United States", "Europe (excl. EU-27)", "EU-27")
 
-global_temp %>%
-  filter(Year == 2013) -> temp_2013
-temp_2013 <- temp_2013[,2:3]
+co2_region_emission = co2_emission %>%
+  rename(Regione = Entity) %>%
+  filter(Regione %in% country_filter) %>%
+  ggplot(aes(x = Year, y = `Annual CO2 emissions`, fill = Regione)) +
+  geom_area(alpha = 0.6, size = .5, colour = "white") +
+  labs(y = "Emissioni Annuali CO2 (tonnellate)") +
+  scale_fill_brewer(palette = "Spectral") +
+  scale_y_continuous(labels = scales::comma) + 
+  scale_x_continuous(breaks = seq(1750, 2019, 50)) +
+  theme_minimal() +
+  #settare un tema può sovrascrivere ciò che viene messo in theme()
+  theme(axis.title.x = element_blank()) 
 
-temp_1850
-temp_2013
+ggplotly(co2_region_emission) %>%
+  config(displayModeBar = FALSE)
 ```
 
 
+# Emissioni pro capite di CO2
+```{r, echo=FALSE, emissioni-co2-procapite}
+co2_emission_percapita = co2_emission_percapita %>%
+  filter(Year == 2019)
 
-```{r, echo=FALSE}
-library(broom)
-world_json <- readOGR("map/custom.geo.json")
-world_json = tidy(world_json, region = "name_long")
+co2_map_percapita <- plot_geo(co2_emission_percapita) %>%
+  add_trace(locations = ~Code,
+            z = ~`Per capita CO2 emissions`,
+            zmin = 0,
+            zmax = 20, 
+            color = ~`Per capita CO2 emissions`,
+            colorscale = "Inferno") %>%
+  colorbar(title = "Emissione CO2 procapite", ticksuffix = " tonnellate") %>%
+  layout(title = "Emissioni CO2 pro capite, 2019") %>%
+  config(displayModeBar = FALSE)
 
-world_json$id[world_json$id == "Russian Federation"] <- "Russia"
-world_json$id[world_json$id == "Democratic Republic of the Congo"] <- "Congo"
-
-world_json %>%
-  filter(id == "South Sudan")
-
-# Unisco i dataset della mappa e delle temperature relative al 1850
-world_json_1850 = world_json %>%
-  left_join(., temp_1850, by = c("id" = "Country"))
-
-# Unisco i dataset della mappa e delle temperature relative al 2013
-world_json_2013 = world_json %>%
-  left_join(., temp_2013, by = c("id" = "Country"))
-
-map_temp_1850 <- ggplot() +
-  ggtitle("Mappa mondiale delle temperature nel 1850") + 
-  geom_polygon(data = world_json_1850, aes(fill = value, x = long, y = lat, group = group)) +
-  theme_void() +
-  coord_map()
-
-
-map_temp_2013 <- ggplot() +
-  ggtitle("Mappa mondiale delle temperature nel 2013") + 
-  geom_polygon(data = world_json_2013, aes(fill = value, x = long, y = lat, group = group)) +
-  theme_void() +
-  coord_map()
-
-map_temp_1850
-map_temp_2013
+co2_map_percapita
 
 ```
 
 
+Nonostante la Cina sia la nazione che negli ultimi anni ha avuto i livelli di emissione di CO2 più alti, mantiene un livello pro capite relativamente basso, non rientrando nella top 10.
+
+```{r, echo=TRUE}
+# 
+co2_emission_percapita %>%
+  select(Entity, Year, `Per capita CO2 emissions`) %>%
+  arrange(desc(`Per capita CO2 emissions`)) %>%
+  head(n = 20)
+```
 
 
-```{r, echo=FALSE}
-# Shiny app per visualizzare l'andamento temporale delle emissioni di co2 a livello mondiale
+Vediamo come i principali stati producono energia
+```{r, echo=FALSE, fonti-energetiche}
+electricity_prod <- read_csv("datasets/electricity-prod-source-stacked.csv")
+
+electricity_prod %>%
+  filter(Entity == "Portugal")
+
+state_filter <- c("France", "Australia")
+
+
+# electricity_prod %>%
+#   gather(key = "Electricity",
+#          value = "TWh produced",
+#          c(-Entity, -Code, -Year)) %>%
+#   filter(Year == 2019, Entity %in% state_filter, Electricity %in% c("Electricity from coal (TWh)", "Electricity from gas (TWh)")) %>%
+#   ggplot(aes(x = Entity, y = `TWh produced`, fill = Electricity)) +
+#   geom_bar(stat = "identity", position = "dodge") +
+#   theme_bw()
+```
+
+```{r, echo=FALSE, shiny-app-energie}
 ui <- fluidPage(
-  titlePanel("Emissioni Annuali di CO2, 1750-2019"),
+  titlePanel("Come si produce energia nel mondo?"),
   
   sidebarLayout(
+    
     sidebarPanel(
-      helpText("Emissioni di CO2 a livello Mondiale
-               dal 1750 a oggi"),
-      
-      sliderInput(inputId = "year",
-                  label = "Anno",
-                  min = 1750,
-                  max = 2019,
-                  value = 1750,
-                  step = 25,
-                  sep = "",
-                  animate = TRUE)
+      fluidRow(
+        column(3, checkboxGroupInput(
+          "countrySelector",
+          label = "Seleziona Stato(i)",
+          choices = list("Francia" = "France",
+                         "Australia" = "Australia",
+                         "Germania" = "Germany",
+                         "Inghilterra" = "United Kingdom",
+                         "Spagna" = "Spain",
+                         "Stati Uniti" = "United States",
+                         "Cina" = "China",
+                         "India" = "India")
+          )
+        ),
+        column(3, checkboxGroupInput(
+          "energySelector",
+          label = "Seleziona Fonte(i) energia",
+          choices = list("Carbone" = "Electricity from coal (TWh)",
+                         "Nucleare" = "Electricity from nuclear (TWh)",
+                         "Gas" = "Electricity from gas (TWh)",
+                         "Petrolio" = "Electricity from oil (TWh)",
+                         "Eolico" = "Electricity from wind (TWh)",
+                         "Idroelettrico" = "Electricity from hydro (TWh)")
+        ))
+      )
     ),
-    mainPanel(
-      plotOutput("emissions")
-    )
+    mainPanel(plotOutput("o"))
   )
-  
 )
 
-server <- function(input, output, session) {
-  
-  output$emissions <- renderPlot({
+server <- function(input, output) {
+  output$o <- renderPlot({
     
-    # filtro il dataset in base all'anno selezionato con lo slider
-    co2_emission %>%
-      filter(Entity == "World", Year <= input$year) %>%
-      ggplot(aes(x = Year, y = `Annual CO2 emissions (tonnes )`)) +
-      geom_line() + 
-      labs(x = "Anno", y = "Emissioni annue di CO2 (tonnellate)") +
-      scale_y_continuous(labels = scales::comma) +
-      #theme(axis.text.x = element_text(size = 32)) + non funziona
-      theme_minimal()
+    state_filter <- c("France", "Australia", "Germany", "United Kingdom", "Spain", "United States", "China", "India")
+    
+    electricity_prod %>%
+      gather(key = "Electricity",
+          value = "TWh produced",
+          c(-Entity, -Code, -Year)) %>%
+      filter(Year == 2019, Entity %in% state_filter) %>%
+      group_by(Entity) %>%
+      mutate(pct = prop.table(`TWh produced`)) %>%
+      filter(Entity %in% input$countrySelector, Electricity %in% input$energySelector) %>%
+      ggplot(aes(x = Entity, y = `TWh produced`, fill = Electricity, label = scales::percent(pct, accuracy = 0.01L))) +
+      geom_bar(stat = "identity", position = "dodge") +
+      geom_text(position = position_dodge(width = .9),
+                vjust = -0.5,
+                size = 3) +
+      labs(title = "2019", y = "Tera Watt/h prodotti") + 
+      scale_fill_discrete(name = "Fonti Energetiche", labels = c("Electricity from coal (TWh)" = "Carbone", 
+                                                                 "Electricity from nuclear (TWh)" = "Nucleare",
+                                                                 "Electricity from gas (TWh)" = "Gas",
+                                                                 "Electricity from oil (TWh)" = "Petrolio",
+                                                                 "Electricity from wind (TWh)" = "Eolico",
+                                                                 "Electricity from hydro (TWh)" = "Idroelettrico")) +
+      theme_bw() +
+      theme(plot.title = element_text(hjust = 0.5, size = 16), 
+        axis.title.x = element_blank(),
+        axis.text = element_text(size = 16))
+    
+    
   })
 }
 
 shinyApp(ui, server)
 ```
-
-
-
-
-```{r, echo=FALSE}
-#Plot dei dati sulla Co2 per ogni stato
-co2_emission %>%
-  filter(Year > 2000, Entity != "Europe (other)") %>%
-  filter(Entity != "World", Entity != "Americas (other)", Entity != "Middle East") %>%
-  filter(Entity != "Germany", Entity != "United Kingdom", Entity != "Japan", Entity != "South Korea", Entity != "Italy") %>%
-  group_by(Year) %>%
-  slice_max(order_by = `Annual CO2 emissions (tonnes )`, n = 10) -> top10_co2_emissions
-
-
-
-
-co2_emission %>% anti_join(top10_co2_emissions, by = 'Entity')  -> use_for_anti_join
-
-co2_emission %>% anti_join(use_for_anti_join) -> clean_data_co2_emission
-
-clean_data_co2_emission %>% 
-  ggplot(aes(Year, `Annual CO2 emissions (tonnes )`, group = Entity, colour = Entity, fill = Entity)) +
-  geom_ribbon(aes(ymin = 0, ymax = `Annual CO2 emissions (tonnes )`), alpha = 0.3) +
-  labs(x = "Anno", y = "Emissioni annue di CO2 (tonnellate)") +
-  scale_y_continuous(labels = scales::comma)
-  theme_minimal()
-
-```
-
-
-
-
-
-
-
 
 
 
