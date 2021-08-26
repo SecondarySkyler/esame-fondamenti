@@ -1,15 +1,15 @@
 ---
-title: "Progetto Data Science"
+title: "Esame Fondamenti di Scienza dei Dati e Laboratorio"
 author: "Cristian Murtas"
-date: "8/14/2021"
-output:
-  slidy_presentation: default
-  beamer_presentation: default
-  ioslides_presentation: default
+output: 
+  ioslides_presentation:
+    css : style.css
+    widescreen: true
+
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE)
 ```
 
 ## Analisi sul cambiamento climatico
@@ -34,7 +34,6 @@ library(readr)
 library(dplyr)
 library(ggplot2)
 library(tidyr)
-library(broom)
 library(maps)
 library(mapproj)
 library(shiny)
@@ -57,6 +56,7 @@ state_code <- read_csv("datasets/state_code.csv") # forse sara' da togliere
 global_temperature <- read_csv("datasets/GlobalTemperatures.csv")
 co2_emission <- read_csv("./datasets/annual-co-emissions-by-region.csv")
 co2_emission_percapita <- read_csv("datasets/co-emissions-per-capita.csv")
+electricity_prod <- read_csv("datasets/electricity-prod-source-stacked.csv")
 ```
 
 
@@ -74,7 +74,7 @@ global_temperature = global_temperature %>%
 ```
 
 
-# Vediamo come è cambiato l'andamento della temperature della superficie terrestre
+## Andamento delle temperature medie
 
 ```{r, echo=FALSE, grafico-temperatura}
 
@@ -99,11 +99,14 @@ global_mean_temperature = global_temperature %>%
 global_mean_temperature.animation = global_mean_temperature +
   transition_reveal(Year)
 
-#animate(global_mean_temperature.animation, height = 500, width = 800, fps = 30, end_pause = 60, res = 100, duration = 10, renderer = gifski_renderer("test.gif"))
-
+animate(global_mean_temperature.animation, height = 500, width = 800, fps = 30, end_pause = 60, res = 100, duration = 10, renderer = gifski_renderer("mean_temp.gif", loop = FALSE))
 ```
+<center>
+![](mean_temp.gif)
+</center>
 
-# Grazie a questa mappa interattiva è possibile analizzare il cambiamento delle temperature superficiali del nostro pianeta
+
+## Cambiamento delle temperature superficiali del nostro pianeta
 ```{r, echo=FALSE, dati-mappa-temperatura}
 # Vado a effettuare la media annuale per ogni stato, al fine di ridurre la dimensionalità del dataset.
 global_temp_by_country = global_temp_by_country %>%
@@ -118,8 +121,8 @@ gt <- global_temp_by_country %>%
   drop_na()
   
 ```
-
-```{r, echo=FALSE, mappa-temperatura}
+<div id="maptemp">
+```{r, echo=FALSE, mappa-temperatura, fig.align='center'}
 
 fig <- plot_geo(gt, frame = ~Year) %>%
   add_trace(locations = ~`Alpha-3 code`,
@@ -139,12 +142,13 @@ fig <- plot_geo(gt, frame = ~Year) %>%
 
 fig
 ```
+</div>
 
 
 
-# Emissioni annuali di CO2
+## Emissioni annuali di CO2
 
-Diamo un'occhiata a come sono cambiate le emissioni di CO2 nel corso degli anni
+Come sono cambiate le emissioni medie annuali negli anni?
 
 ```{r, echo=FALSE, emissioni-annuali}
 world_co2_emission = co2_emission %>%
@@ -166,13 +170,15 @@ world_co2_emission.animation = world_co2_emission +
   transition_reveal(Year) +
   view_follow()
 
-#animate(world_co2_emission.animation, height = 500, width = 800, fps = 30, end_pause = 60, res = 100, duration = 10, renderer = gifski_renderer("world_co2.gif"))
+#animate(world_co2_emission.animation, height = 500, width = 800, fps = 30, end_pause = 60, res = 100, duration = 10, renderer = gifski_renderer("world_co2.gif", loop = FALSE))
 
 ```
+<center>
+![](world_co2.gif)
+</center>
 
 
-
-# Emissioni annuali di CO2 delle regioni mondiali
+## Emissioni annuali di CO2 delle regioni mondiali
 
 ```{r, echo=FALSE, emissioni-regioni}
 # Creo un filtro (grazie a un array) con le regioni mondiali
@@ -196,10 +202,13 @@ ggplotly(co2_region_emission) %>%
 ```
 
 
-# Emissioni pro capite di CO2
+## Emissioni pro capite di CO2
 ```{r, echo=FALSE, emissioni-co2-procapite}
 co2_emission_percapita = co2_emission_percapita %>%
   filter(Year == 2019)
+```
+
+```{r, echo=FALSE, mappa-emissioni-procapite}
 
 co2_map_percapita <- plot_geo(co2_emission_percapita) %>%
   add_trace(locations = ~Code,
@@ -208,8 +217,8 @@ co2_map_percapita <- plot_geo(co2_emission_percapita) %>%
             zmax = 20, 
             color = ~`Per capita CO2 emissions`,
             colorscale = "Inferno") %>%
+  layout(title = "Emissioni CO2 pro capite\n 2019") %>%
   colorbar(title = "Emissione CO2 procapite", ticksuffix = " tonnellate") %>%
-  layout(title = "Emissioni CO2 pro capite, 2019") %>%
   config(displayModeBar = FALSE)
 
 co2_map_percapita
@@ -217,46 +226,25 @@ co2_map_percapita
 ```
 
 
-Nonostante la Cina sia la nazione che negli ultimi anni ha avuto i livelli di emissione di CO2 più alti, mantiene un livello pro capite relativamente basso, non rientrando nella top 10.
-
+## Top 15 paesi 
 ```{r, echo=TRUE}
-# 
+
 co2_emission_percapita %>%
   select(Entity, Year, `Per capita CO2 emissions`) %>%
   arrange(desc(`Per capita CO2 emissions`)) %>%
-  head(n = 20)
+  head(n = 15)
 ```
 
 
-Vediamo come i principali stati producono energia
-```{r, echo=FALSE, fonti-energetiche}
-electricity_prod <- read_csv("datasets/electricity-prod-source-stacked.csv")
-
-electricity_prod %>%
-  filter(Entity == "Portugal")
-
-state_filter <- c("France", "Australia")
-
-
-# electricity_prod %>%
-#   gather(key = "Electricity",
-#          value = "TWh produced",
-#          c(-Entity, -Code, -Year)) %>%
-#   filter(Year == 2019, Entity %in% state_filter, Electricity %in% c("Electricity from coal (TWh)", "Electricity from gas (TWh)")) %>%
-#   ggplot(aes(x = Entity, y = `TWh produced`, fill = Electricity)) +
-#   geom_bar(stat = "identity", position = "dodge") +
-#   theme_bw()
-```
-
+## Produzione di energia per stato
 ```{r, echo=FALSE, shiny-app-energie}
 ui <- fluidPage(
   titlePanel("Come si produce energia nel mondo?"),
   
   sidebarLayout(
-    
     sidebarPanel(
       fluidRow(
-        column(3, checkboxGroupInput(
+        column(6, checkboxGroupInput(
           "countrySelector",
           label = "Seleziona Stato(i)",
           choices = list("Francia" = "France",
@@ -267,11 +255,10 @@ ui <- fluidPage(
                          "Stati Uniti" = "United States",
                          "Cina" = "China",
                          "India" = "India")
-          )
-        ),
-        column(3, checkboxGroupInput(
+        )),
+        column(6, checkboxGroupInput(
           "energySelector",
-          label = "Seleziona Fonte(i) energia",
+          label = "Seleziona Fonte(i) Energia",
           choices = list("Carbone" = "Electricity from coal (TWh)",
                          "Nucleare" = "Electricity from nuclear (TWh)",
                          "Gas" = "Electricity from gas (TWh)",
@@ -284,6 +271,7 @@ ui <- fluidPage(
     mainPanel(plotOutput("o"))
   )
 )
+
 
 server <- function(input, output) {
   output$o <- renderPlot({
