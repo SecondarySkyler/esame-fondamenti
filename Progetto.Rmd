@@ -1,11 +1,11 @@
 ---
 title: "Esame Fondamenti di Scienza dei Dati e Laboratorio"
 author: "Cristian Murtas"
-output: 
+output:
   ioslides_presentation:
-    css : style.css
-    widescreen: true
-
+    css: style.css
+    widescreen: yes
+  slidy_presentation: default
 ---
 
 ```{r setup, include=FALSE}
@@ -23,7 +23,7 @@ In particolare andremo a cercare una risposta alle seguenti domande:
 - Com' è cambiata l'emissione di CO2 nel corso degli anni?
 - Qual è la regione che emette più anidride carbonica? E come è cambiato l'andamento nel corso degli anni?
 - C'è correlazione tra un'elevata emissione e il numero della popolazione?
-...
+- Come viene prodotta l'elettricità nel mondo?
 
 
 
@@ -50,9 +50,6 @@ library(plotly)
 # Importiamo i datasets
 global_temp_by_country <- read_csv("./datasets/GlobalLandTemperaturesByCountry.csv")
 iso3_code <- read_csv("datasets/countries_codes_and_coordinates.csv")
-
-state_code <- read_csv("datasets/state_code.csv") # forse sara' da togliere
-
 global_temperature <- read_csv("datasets/GlobalTemperatures.csv")
 co2_emission <- read_csv("./datasets/annual-co-emissions-by-region.csv")
 co2_emission_percapita <- read_csv("datasets/co-emissions-per-capita.csv")
@@ -99,7 +96,7 @@ global_mean_temperature = global_temperature %>%
 global_mean_temperature.animation = global_mean_temperature +
   transition_reveal(Year)
 
-animate(global_mean_temperature.animation, height = 500, width = 800, fps = 30, end_pause = 60, res = 100, duration = 10, renderer = gifski_renderer("mean_temp.gif", loop = FALSE))
+#animate(global_mean_temperature.animation, height = 500, width = 800, fps = 30, end_pause = 60, res = 100, duration = 10, renderer = gifski_renderer("mean_temp.gif", loop = FALSE))
 ```
 <center>
 ![](mean_temp.gif)
@@ -146,8 +143,8 @@ fig
 
 
 
-## Emissioni annuali di CO2
-
+## Emissioni annuali di CO2 {.title}
+#### 1750 - 2019
 Come sono cambiate le emissioni medie annuali negli anni?
 
 ```{r, echo=FALSE, emissioni-annuali}
@@ -155,8 +152,7 @@ world_co2_emission = co2_emission %>%
   filter(Entity == "World") %>%
   ggplot(aes(x = Year, y = `Annual CO2 emissions`)) +
   geom_line(size = 1, color = "darkolivegreen2") + 
-  labs(title = "Emissioni Annuali CO2", 
-       subtitle = "1750 - 2019",
+  labs(
        y = "Emissioni annue di CO2 (tonnellate)",
        caption = "Source: Global Carbon Project") +
   scale_y_continuous(labels = scales::comma) +
@@ -170,12 +166,12 @@ world_co2_emission.animation = world_co2_emission +
   transition_reveal(Year) +
   view_follow()
 
-#animate(world_co2_emission.animation, height = 500, width = 800, fps = 30, end_pause = 60, res = 100, duration = 10, renderer = gifski_renderer("world_co2.gif", loop = FALSE))
+animate(world_co2_emission.animation, height = 500, width = 800, fps = 30, end_pause = 60, res = 100, duration = 10, renderer = gifski_renderer("world_co2.gif", loop = FALSE))
 
 ```
-<center>
-![](world_co2.gif)
-</center>
+<!-- <center> -->
+<!-- ![](world_co2.gif) -->
+<!-- </center> -->
 
 
 ## Emissioni annuali di CO2 delle regioni mondiali
@@ -227,7 +223,7 @@ co2_map_percapita
 
 
 ## Top 15 paesi 
-```{r, echo=TRUE}
+```{r, echo=FALSE}
 
 co2_emission_percapita %>%
   select(Entity, Year, `Per capita CO2 emissions`) %>%
@@ -236,7 +232,7 @@ co2_emission_percapita %>%
 ```
 
 
-## Produzione di energia per stato
+## Produzione di energia per stato {.title}
 ```{r, echo=FALSE, shiny-app-energie}
 ui <- fluidPage(
   titlePanel("Come si produce energia nel mondo?"),
@@ -311,4 +307,8 @@ shinyApp(ui, server)
 ```
 
 
-
+## Bibliografia & Dataset
+- [Temperature medie](https://www.kaggle.com/berkeleyearth/climate-change-earth-surface-temperature-data)
+- [Emissioni CO2 / Pro capite](http://www.globalcarbonatlas.org/en/CO2-emissions)
+- [Produzione energia](https://ourworldindata.org/grapher/electricity-prod-source-stacked?country=~FRA)
+- [Coal Phase-Out](https://en.wikipedia.org/wiki/Coal_phase-out)
