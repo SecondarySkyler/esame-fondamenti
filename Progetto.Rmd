@@ -1,11 +1,9 @@
 ---
 title: "Esame Fondamenti di Scienza dei Dati e Laboratorio"
-author: "Cristian Murtas"
+author: "Cristian Murtas, 150521"
 output:
   ioslides_presentation:
     css: style.css
-    widescreen: yes
-  slidy_presentation: default
 ---
 
 ```{r setup, include=FALSE}
@@ -20,9 +18,9 @@ Lo scopo di questa analisi è quello di fornire un quadro generale sulla questio
 In particolare andremo a cercare una risposta alle seguenti domande:
 
 - Come sono cambiate le temperature medie della superficie terrestre nel corso degli anni?
-- Com' è cambiata l'emissione di CO2 nel corso degli anni?
+- Com'è cambiata l'emissione di CO2 nel corso degli anni?
 - Qual è la regione che emette più anidride carbonica? E come è cambiato l'andamento nel corso degli anni?
-- C'è correlazione tra un'elevata emissione e il numero della popolazione?
+- Come si riflette l'emissione di co2 sul livello pro capite?
 - Come viene prodotta l'elettricità nel mondo?
 
 
@@ -34,11 +32,8 @@ library(readr)
 library(dplyr)
 library(ggplot2)
 library(tidyr)
-library(maps)
-library(mapproj)
 library(shiny)
 library(ggthemes)
-library(sf)
 library(gganimate)
 library(gifski)
 library(plotly)
@@ -103,7 +98,7 @@ global_mean_temperature.animation = global_mean_temperature +
 </center>
 
 
-## Cambiamento delle temperature superficiali del nostro pianeta
+## Cambiamento delle temperature superficiali
 ```{r, echo=FALSE, dati-mappa-temperatura}
 # Vado a effettuare la media annuale per ogni stato, al fine di ridurre la dimensionalità del dataset.
 global_temp_by_country = global_temp_by_country %>%
@@ -118,8 +113,9 @@ gt <- global_temp_by_country %>%
   drop_na()
   
 ```
-<div id="maptemp">
+
 ```{r, echo=FALSE, mappa-temperatura, fig.align='center'}
+mrg <- list(b = 100)
 
 fig <- plot_geo(gt, frame = ~Year) %>%
   add_trace(locations = ~`Alpha-3 code`,
@@ -129,23 +125,21 @@ fig <- plot_geo(gt, frame = ~Year) %>%
             color = ~`Media Annuale`,
             colorscale = "Hot_r") %>%
   layout(title = "Temperature Medie Annuali\n1850 - 2013",
-         geo = list(
-           showocean = TRUE,
-           oceancolor = rgb(0,1,1)
-         )) %>%
+         geo = list(showocean = TRUE, oceancolor = rgb(0,1,1)),
+           margin = mrg) %>%
   animation_opts(20) %>%
   colorbar(title = "Media", ticksuffix = " °C") %>%
   config(displayModeBar = FALSE)
 
 fig
 ```
-</div>
+
 
 
 
 ## Emissioni annuali di CO2 {.title}
 #### 1750 - 2019
-Come sono cambiate le emissioni medie annuali negli anni?
+Come sono cambiate le medie annuali negli anni?
 
 ```{r, echo=FALSE, emissioni-annuali}
 world_co2_emission = co2_emission %>%
@@ -166,18 +160,17 @@ world_co2_emission.animation = world_co2_emission +
   transition_reveal(Year) +
   view_follow()
 
-animate(world_co2_emission.animation, height = 500, width = 800, fps = 30, end_pause = 60, res = 100, duration = 10, renderer = gifski_renderer("world_co2.gif", loop = FALSE))
+#animate(world_co2_emission.animation, height = 500, width = 800, fps = 30, end_pause = 60, res = 100, duration = 10, renderer = gifski_renderer("world_co2.gif", loop = FALSE))
 
 ```
-<!-- <center> -->
-<!-- ![](world_co2.gif) -->
-<!-- </center> -->
+<center>
+![](world_co2.gif)
+</center>
 
 
 ## Emissioni annuali di CO2 delle regioni mondiali
-
 ```{r, echo=FALSE, emissioni-regioni}
-# Creo un filtro (grazie a un array) con le regioni mondiali
+# Creo un filtro con le regioni mondiali
 country_filter <- c("International transport", "Oceania", "Asia (excl. China & India)", "China", "India", "Africa", "South America", "North America (excl. USA)", "United States", "Europe (excl. EU-27)", "EU-27")
 
 co2_region_emission = co2_emission %>%
@@ -193,8 +186,9 @@ co2_region_emission = co2_emission %>%
   #settare un tema può sovrascrivere ciò che viene messo in theme()
   theme(axis.title.x = element_blank()) 
 
-ggplotly(co2_region_emission) %>%
-  config(displayModeBar = FALSE)
+co2_region_emission
+# ggplotly(co2_region_emission) %>%
+#   config(displayModeBar = FALSE)
 ```
 
 
@@ -232,7 +226,7 @@ co2_emission_percapita %>%
 ```
 
 
-## Produzione di energia per stato {.title}
+## Produzione di energia per stato {.shiny-app}
 ```{r, echo=FALSE, shiny-app-energie}
 ui <- fluidPage(
   titlePanel("Come si produce energia nel mondo?"),
@@ -260,6 +254,7 @@ ui <- fluidPage(
                          "Gas" = "Electricity from gas (TWh)",
                          "Petrolio" = "Electricity from oil (TWh)",
                          "Eolico" = "Electricity from wind (TWh)",
+                         "Solare" = "Electricity from solar (TWh)",
                          "Idroelettrico" = "Electricity from hydro (TWh)")
         ))
       )
@@ -273,6 +268,7 @@ server <- function(input, output) {
   output$o <- renderPlot({
     
     state_filter <- c("France", "Australia", "Germany", "United Kingdom", "Spain", "United States", "China", "India")
+    myColors <- c("#2e2e2e", "#275fe3", "#4cade6", "#7f868a", "#089591", "#ffc233", "#03fc8c")
     
     electricity_prod %>%
       gather(key = "Electricity",
@@ -287,19 +283,18 @@ server <- function(input, output) {
       geom_text(position = position_dodge(width = .9),
                 vjust = -0.5,
                 size = 3) +
-      labs(title = "2019", y = "Tera Watt/h prodotti") + 
-      scale_fill_discrete(name = "Fonti Energetiche", labels = c("Electricity from coal (TWh)" = "Carbone", 
-                                                                 "Electricity from nuclear (TWh)" = "Nucleare",
-                                                                 "Electricity from gas (TWh)" = "Gas",
-                                                                 "Electricity from oil (TWh)" = "Petrolio",
-                                                                 "Electricity from wind (TWh)" = "Eolico",
-                                                                 "Electricity from hydro (TWh)" = "Idroelettrico")) +
+      labs(title = "2019", y = "Tera Watt/h prodotti", fill = "Fonti Energetiche") + 
+      scale_fill_manual(values = myColors, labels = c("Electricity from coal (TWh)" = "Carbone", 
+                                                                  "Electricity from nuclear (TWh)" = "Nucleare",
+                                                                  "Electricity from gas (TWh)" = "Gas",
+                                                                  "Electricity from oil (TWh)" = "Petrolio",
+                                                                  "Electricity from wind (TWh)" = "Eolico",
+                                                                  "Electricity from solar (TWh)" = "Solare",
+                                                                  "Electricity from hydro (TWh)" = "Idroelettrico")) +
       theme_bw() +
       theme(plot.title = element_text(hjust = 0.5, size = 16), 
         axis.title.x = element_blank(),
         axis.text = element_text(size = 16))
-    
-    
   })
 }
 
