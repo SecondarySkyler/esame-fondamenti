@@ -10,7 +10,10 @@ output:
 knitr::opts_chunk$set(echo = FALSE, message = FALSE)
 ```
 
-## Analisi sul cambiamento climatico
+## Analisi sul riscaldamento globale
+
+Il surriscaldamento globale indica il mutamento del clima che si è sviluppato a partire dalla fine del 18esimo secolo e tuttora in corso.
+Esso è caratterizzato, in generale, dall'aumento della temperatura media globale.
 
 Negli ultimi anni si sente sempre di più parlare del cambiamento climatico e del surriscaldamento globale, non solo, anche gli avvenimenti ambientali, come per esempio precipitazioni e temperature, parlano da sole.
 
@@ -37,6 +40,7 @@ library(ggthemes)
 library(gganimate)
 library(gifski)
 library(plotly)
+library(kableExtra)
 ```
 
 
@@ -218,11 +222,15 @@ co2_map_percapita
 
 ## Top 15 paesi 
 ```{r, echo=FALSE}
-
-co2_emission_percapita %>%
-  select(Entity, Year, `Per capita CO2 emissions`) %>%
-  arrange(desc(`Per capita CO2 emissions`)) %>%
-  head(n = 15)
+knitr::kable(co2_emission_percapita %>%
+             select(Entity, Year, `Per capita CO2 emissions`) %>%
+             arrange(desc(`Per capita CO2 emissions`)) %>%
+             head(n = 15),
+             col.names = c("Stato", "Anno", "Emissione pro capite"),
+             caption = "I 15 stati con il livello di emissione pro capite più elevato",
+             align = "c") %>%
+  kable_paper(bootstrap_options = "striped", full_width = T)
+  
 ```
 
 
@@ -302,8 +310,11 @@ shinyApp(ui, server)
 ```
 
 
-## Bibliografia & Dataset
+## Dataset & Bibliografia  
 - [Temperature medie](https://www.kaggle.com/berkeleyearth/climate-change-earth-surface-temperature-data)
 - [Emissioni CO2 / Pro capite](http://www.globalcarbonatlas.org/en/CO2-emissions)
 - [Produzione energia](https://ourworldindata.org/grapher/electricity-prod-source-stacked?country=~FRA)
+
 - [Coal Phase-Out](https://en.wikipedia.org/wiki/Coal_phase-out)
+- [US e il Paris Agreement](https://www.whitehouse.gov/briefing-room/statements-releases/2021/04/22/fact-sheet-president-biden-sets-2030-greenhouse-gas-pollution-reduction-target-aimed-at-creating-good-paying-union-jobs-and-securing-u-s-leadership-on-clean-energy-technologies/)
+- [Accordo di Parigi](https://it.wikipedia.org/wiki/Accordo_di_Parigi_(2015))
