@@ -1,0 +1,365 @@
+---
+title: "Prosa"
+author: "Cristian Murtas"
+date: "9/1/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+```
+
+# Analisi sul riscaldamento globale
+
+Il surriscaldamento globale indica il mutamento del clima che si è sviluppato a partire dalla fine del 18esimo secolo e tuttora in corso.
+Esso è caratterizzato, in generale, dall'aumento della temperatura media globale.
+
+Secondo il Gruppo Intergovernativo sul Cambiamento Climatico (IPCC) la causa predominante è da ricercare nell'attività umana, in particolare nella quantità crescente di gas serra che viene emessa nell'atmosfera con il conseguente incremento dell'omonimo effetto.
+
+Con l'analisi svolta, l'obiettivo è quello di avere un quadro generale di come la situazione si è evoluta nel corso degli anni, analizzando l'aumento delle temperature e l'innalzamento delle emissioni di anidride carbonica nell'atmosfera.
+
+Tramite l'interpretazione dei dati andremo a cercare una risposta alle seguenti domande:
+
+- Come sono cambiate le temperature medie della superficie terrestre nel corso degli anni?
+- Com'è cambiata l'emissione di CO2 nel corso degli anni?
+- Qual è la regione che emette più anidride carbonica e come è cambiato l'andamento nel corso degli anni?
+- Come si riflette l'emissione di CO2 a livello pro capite?
+- Come viene prodotta l'elettricità nel mondo?
+
+
+
+
+```{r, echo = FALSE, results='hide', librerie}
+# Importiamo le librerie
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(shiny)
+library(ggthemes)
+library(gganimate)
+library(gifski)
+library(plotly)
+library(kableExtra)
+```
+
+
+
+```{r, echo = FALSE, dataset}
+# Importiamo i datasets
+global_temp_by_country <- read_csv("./datasets/GlobalLandTemperaturesByCountry.csv")
+iso3_code <- read_csv("datasets/countries_codes_and_coordinates.csv")
+global_temperature <- read_csv("datasets/GlobalTemperatures.csv")
+co2_emission <- read_csv("./datasets/annual-co-emissions-by-region.csv")
+co2_emission_percapita <- read_csv("datasets/co-emissions-per-capita.csv")
+electricity_prod <- read_csv("datasets/electricity-prod-source-stacked.csv")
+```
+
+
+
+```{r, echo=FALSE, conversioneData}
+# Divido la data in Year, Month, Day
+global_temp_by_country = global_temp_by_country %>%
+  drop_na() %>%
+  separate(col = dt, into = c("Year", "Month", "Day"), convert = TRUE) %>%
+  filter(Year > 1849)
+  
+
+global_temperature = global_temperature %>%
+  separate(col = dt, into = c("Year", "Month", "Day"), convert = TRUE)
+```
+
+
+# - Come sono cambiate le temperature medie della superficie terrestre nel corso degli anni?
+Il grafico rende possibile notare come l'accrescimento della temperatura media globale abbia preso piede verso la fine del 18esimo secolo.
+L'aumento di circa 0,7°C registrato solo nel XX secolo sta causando attualmente importanti perdite di ghiaccio e il conseguente innalzamento del livello del mare.
+
+ 
+## Andamento delle temperature medie
+
+```{r, echo=FALSE, grafico-temperatura}
+
+global_mean_temperature = global_temperature %>%
+  drop_na() %>%
+  group_by(Year) %>%
+  summarize(LandAverageTemperatureByYear = mean(LandAverageTemperature)) %>%
+  ggplot(aes(x = Year, y = LandAverageTemperatureByYear)) +
+  geom_line(color = "gold1") +
+  labs(title = "Andamento annuale della temperatura",
+       subtitle = "1850 - 2015",
+       y = "Temperatura Media (Celsius °C)",
+       caption = "Source: Kaggle") +
+  theme_minimal() +
+  theme(text = element_text(family = "DM Sans Medium"),
+        axis.title.x = element_blank(),
+        legend.position = "bottom") +
+  scale_x_continuous(limits = c(1850, 2015)) +
+  geom_point(color = "goldenrod3")
+  
+
+global_mean_temperature.animation = global_mean_temperature +
+  transition_reveal(Year)
+
+#animate(global_mean_temperature.animation, height = 500, width = 800, fps = 30, end_pause = 60, res = 100, duration = 10, renderer = gifski_renderer("mean_temp.gif", loop = FALSE))
+```
+<center>
+![](mean_temp.gif)
+</center>
+
+
+## Cambiamento delle temperature superficiali
+
+Il grafico interattivo mostra il cambiamento della temperatura media superficiale misurata fra il 1850 e il 2013.
+Ciò che si può notare è che, per via della maggiore distribuzione di terre emerse, il riscaldamento globale tende a non essere uniforme in tutto il mondo.
+Infatti, esso è più accentuato nell'emisfero boreale e alle latitudini settentrionali le cui zone artica, siberica e canadese sono in forte riscaldamento.
+
+```{r, echo=FALSE, dati-mappa-temperatura}
+# Vado a effettuare la media annuale per ogni stato, al fine di ridurre la dimensionalità del dataset.
+global_temp_by_country = global_temp_by_country %>%
+  group_by(Country, Year) %>%
+  summarize(`Media Annuale` = mean(AverageTemperature)) %>%
+  drop_na()
+
+# Unisco il dataset delle temperature al dataset dei codici iso-3, al fine di mappare correttamente gli stati  
+gt <- global_temp_by_country %>% 
+  left_join(., iso3_code, by = "Country") %>%
+  select(Year, `Media Annuale`, Country, `Alpha-3 code`) %>%
+  drop_na()
+  
+```
+
+```{r, echo=FALSE, mappa-temperatura, fig.align='center'}
+mrg <- list(b = 100)
+
+fig <- plot_geo(gt, frame = ~Year) %>%
+  add_trace(locations = ~`Alpha-3 code`,
+            z = ~`Media Annuale`,
+            zmin = min(gt$`Media Annuale`),
+            zmax = max(gt$`Media Annuale`),
+            color = ~`Media Annuale`,
+            colorscale = "Hot_r") %>%
+  layout(title = "Temperature Medie Annuali\n1850 - 2013",
+         geo = list(showocean = TRUE, oceancolor = rgb(0,1,1)),
+           margin = mrg) %>%
+  animation_opts(20) %>%
+  colorbar(title = "Media", ticksuffix = " °C") %>%
+  config(displayModeBar = FALSE)
+
+fig
+```
+
+
+# - Com'è cambiata l'emissione di CO2 nel corso degli anni?
+
+Il grafico rappresenta la crescita delle emissioni a partire dal 1750 fino ai giorni nostri.
+Si può notare come prima della rivoluzione industriale le emissioni fossero molto basse, sviluppando una crescita lenta fino alla prima metà del XX secolo.
+Negli anni a venire, tra il 1950 e i primi anni 2000, le emissioni di co2 quadruplicarono, raggiungendo circa 25 miliardi di tonnellate l’anno.
+L’aumento continuò vertiginosamente per arrivare fino al 2019, anno in cui sono state emesse 35 miliardi di tonnellate di CO2.
+
+## Emissioni annuali di CO2 {.title}
+```{r, echo=FALSE, emissioni-annuali}
+world_co2_emission = co2_emission %>%
+  filter(Entity == "World") %>%
+  ggplot(aes(x = Year, y = `Annual CO2 emissions`)) +
+  geom_line(size = 1, color = "darkolivegreen2") + 
+  labs(
+       y = "Emissioni annue di CO2 (tonnellate)",
+       caption = "Source: Global Carbon Project") +
+  scale_y_continuous(labels = scales::comma) +
+  theme_minimal() +
+  geom_point(color = "forestgreen") +
+  theme(text = element_text(family = "DM Sans Medium"),
+        axis.title.x = element_blank()
+  )
+
+world_co2_emission.animation = world_co2_emission +
+  transition_reveal(Year) +
+  view_follow()
+
+#animate(world_co2_emission.animation, height = 500, width = 800, fps = 30, end_pause = 60, res = 100, duration = 10, renderer = gifski_renderer("world_co2.gif", loop = FALSE))
+
+```
+<center>
+![](world_co2.gif)
+</center>
+
+
+Andiamo più nel dettaglio e iniziamo a vedere come si distribuisce, nel mondo, l’emissione di CO2, vediamo quanta anidride carbonica venga emessa ogni anno, in quale regione del mondo e in che quantità.
+
+# - Qual è la regione che emette più anidride carbonica e come è cambiato l'andamento nel corso degli anni?
+
+Possiamo notare come, fino alla metà del XX secolo, la maggior parte delle emissioni si attribuissero all’Europa e agli Stati Uniti, ma le cose sono cambiate significativamente nel periodo seguente.
+Balza all’occhio il notevole incremento delle emissioni nel resto del mondo, in particolare in Asia e, soprattutto, in Cina.
+Ora USA e Europa producono circa un terzo delle emissioni.
+
+## Emissioni annuali di CO2 delle regioni mondiali
+```{r, echo=FALSE, emissioni-regioni}
+# Creo un filtro con le regioni mondiali
+country_filter <- c("International transport", "Oceania", "Asia (excl. China & India)", "China", "India", "Africa", "South America", "North America (excl. USA)", "United States", "Europe (excl. EU-27)", "EU-27")
+
+co2_region_emission = co2_emission %>%
+  rename(Regione = Entity) %>%
+  filter(Regione %in% country_filter) %>%
+  ggplot(aes(x = Year, y = `Annual CO2 emissions`, fill = Regione)) +
+  geom_area(alpha = 0.6, size = .5, colour = "white") +
+  labs(y = "Emissioni Annuali CO2 (tonnellate)") +
+  scale_fill_brewer(palette = "Spectral") +
+  scale_y_continuous(labels = scales::comma) + 
+  scale_x_continuous(breaks = seq(1750, 2019, 50)) +
+  theme_minimal() +
+  #settare un tema può sovrascrivere ciò che viene messo in theme()
+  theme(axis.title.x = element_blank()) 
+
+co2_region_emission
+# ggplotly(co2_region_emission) %>%
+#   config(displayModeBar = FALSE)
+```
+
+Altro ottimo spunto che ha senso prendere in considerazione è il quantitativo di emissioni pro capite, relativo al 2019, per ciascuno stato nel mondo.
+
+# - Come si riflette l'emissione di CO2 sul livello pro capite?
+
+La prima cosa che si può notare è la forte disuguaglianza in tutto il globo.
+In contrapposizione alle mie aspettative, i paesi medio-orientali risultano essere quelli più inquinanti, poiché la loro economia si basa sull’estrazione del petrolio e contemporaneamente contano una popolazione decisamente più  ridotta rispetto ad altri stati considerati.
+Infatti, ci sono regioni più popolose che hanno un elevato livello di emissioni pro capite ed emissione in generale come: USA, Australia e Canada.
+
+## Emissioni pro capite di CO2
+```{r, echo=FALSE, emissioni-co2-procapite}
+co2_emission_percapita = co2_emission_percapita %>%
+  filter(Year == 2019)
+```
+
+```{r, echo=FALSE, mappa-emissioni-procapite}
+
+co2_map_percapita <- plot_geo(co2_emission_percapita) %>%
+  add_trace(locations = ~Code,
+            z = ~`Per capita CO2 emissions`,
+            zmin = 0,
+            zmax = 20, 
+            color = ~`Per capita CO2 emissions`,
+            colorscale = "Inferno") %>%
+  layout(title = "Emissioni CO2 pro capite\n 2019") %>%
+  colorbar(title = "Emissione CO2 procapite", ticksuffix = " tonnellate") %>%
+  config(displayModeBar = FALSE)
+
+co2_map_percapita
+
+```
+
+
+## Top 15 paesi 
+```{r, echo=FALSE}
+knitr::kable(co2_emission_percapita %>%
+             select(Entity, Year, `Per capita CO2 emissions`) %>%
+             arrange(desc(`Per capita CO2 emissions`)) %>%
+             head(n = 15),
+             col.names = c("Stato", "Anno", "Emissione pro capite"),
+             caption = "I 15 stati con il livello di emissione pro capite più elevato",
+             align = "c") %>%
+  kable_paper(bootstrap_options = "striped", full_width = T)
+  
+```
+
+# - Come viene prodotta l'elettricità nel mondo?
+
+In conclusione, ho voluto analizzare vari paesi nel mondo in cui viene prodotta energia.
+Nello specifico, grazie a questa shiny app, possiamo osservare alcuni dei maggiori stati europei come Francia, Germania, Spagna e Regno Unito, gli Stati Uniti e alcuni paesi asiatici come Cina e India.
+
+Il fine è quello di capire quali di questi siano più propensi all’uso di fonti energetiche rinnovabili, considerando eventuali politiche intraprese con l’obiettivo di ridurre le emissioni di CO2.
+
+## Produzione di energia per stato {.shiny-app}
+```{r, echo=FALSE, shiny-app-energie}
+ui <- fluidPage(
+  titlePanel("Come si produce energia nel mondo?"),
+  
+  sidebarLayout(
+    sidebarPanel(
+      fluidRow(
+        column(6, checkboxGroupInput(
+          "countrySelector",
+          label = "Seleziona Stato(i)",
+          choices = list("Francia" = "France",
+                         "Australia" = "Australia",
+                         "Germania" = "Germany",
+                         "Inghilterra" = "United Kingdom",
+                         "Spagna" = "Spain",
+                         "Stati Uniti" = "United States",
+                         "Cina" = "China",
+                         "India" = "India")
+        )),
+        column(6, checkboxGroupInput(
+          "energySelector",
+          label = "Seleziona Fonte(i) Energia",
+          choices = list("Carbone" = "Electricity from coal (TWh)",
+                         "Nucleare" = "Electricity from nuclear (TWh)",
+                         "Gas" = "Electricity from gas (TWh)",
+                         "Petrolio" = "Electricity from oil (TWh)",
+                         "Eolico" = "Electricity from wind (TWh)",
+                         "Solare" = "Electricity from solar (TWh)",
+                         "Idroelettrico" = "Electricity from hydro (TWh)")
+        ))
+      )
+    ),
+    mainPanel(plotOutput("o"))
+  )
+)
+
+
+server <- function(input, output) {
+  output$o <- renderPlot({
+    
+    state_filter <- c("France", "Australia", "Germany", "United Kingdom", "Spain", "United States", "China", "India")
+    myColors <- c("#2e2e2e", "#275fe3", "#4cade6", "#7f868a", "#089591", "#ffc233", "#03fc8c")
+    
+    electricity_prod %>%
+      gather(key = "Electricity",
+          value = "TWh produced",
+          c(-Entity, -Code, -Year)) %>%
+      filter(Year == 2019, Entity %in% state_filter) %>%
+      group_by(Entity) %>%
+      mutate(pct = prop.table(`TWh produced`)) %>%
+      filter(Entity %in% input$countrySelector, Electricity %in% input$energySelector) %>%
+      ggplot(aes(x = Entity, y = `TWh produced`, fill = Electricity, label = scales::percent(pct, accuracy = 0.01L))) +
+      geom_bar(stat = "identity", position = "dodge") +
+      geom_text(position = position_dodge(width = .9),
+                vjust = -0.5,
+                size = 3) +
+      labs(title = "2019", y = "Tera Watt/h prodotti", fill = "Fonti Energetiche") + 
+      scale_fill_manual(values = myColors, labels = c("Electricity from coal (TWh)" = "Carbone", 
+                                                                  "Electricity from nuclear (TWh)" = "Nucleare",
+                                                                  "Electricity from gas (TWh)" = "Gas",
+                                                                  "Electricity from oil (TWh)" = "Petrolio",
+                                                                  "Electricity from wind (TWh)" = "Eolico",
+                                                                  "Electricity from solar (TWh)" = "Solare",
+                                                                  "Electricity from hydro (TWh)" = "Idroelettrico")) +
+      theme_bw() +
+      theme(plot.title = element_text(hjust = 0.5, size = 16), 
+        axis.title.x = element_blank(),
+        axis.text = element_text(size = 16))
+  })
+}
+
+shinyApp(ui, server)
+```
+
+Guardando i dati relativi agli stati europei notiamo subito che, escludendo la Germania, la produzione di elettricità è dovuta allo sfruttamento del nucleare e alle risorse rinnovabili.
+Questa è la conseguenza del fatto che la maggior parte dei paesi sul continente europeo, e facenti parte dell'Accordo di Parigi, abbiano intrapreso delle politiche per il così detto "coal phase-out", una transizione atta a terminare l’uso del carbone come combustibile fossile entro il 2030.
+
+Per quanto riguarda la Cina, circa il 62% della produzione energetica si deve alla combustione di carbone. 
+Questo numero elevato è da riscontrarsi sulla maggiore richiesta energetica che il paese ha dovuto affrontare a causa della forte industrializzazione che lo ha investito negli ultimi decenni.
+L’uso così intenso si è tradotto in un deterioramento della qualità dell’aria, la quale ha portato molte delle sue città a soffrire a causa dello smog.
+Per contrastare il problema, la Cina prevede di raggiungere il traguardo carbon neutral entro il 2050 e dal 2009 lo stato sta effettuando grossi investimenti nella costruzione di siti per lo sfruttamento di energie rinnovabili quali idroelettrico e nucleare.
+Gli Stati Uniti, nel 2007, avevano in progetto la costruzione di circa 150 impianti per lo sfruttamento del carbone al fine di proddurre energia.
+Nel 2012 questo numero calò a 15 impianti, in seguito alle nuove limitazioni sulle emissioni sottoscritte dai diversi stati della federazione.
+Come la maggior parte degli altri Paesi nel mondo, anche l'America si è posta l'obiettivo di diminuire del 50% le emissioni di anidride carbonica entro il 2030, per poi raggiungere le 0 emissioni entro il 2050, affermando inoltre l'intenzione di voler rientrare nel così detto "Accordo di Parigi".
+
+Esso è un patto stipulato tra gli Stati membri delle Nazioni Unite con il quale si vuole contenere l'aumento della temperatura media globale (sotto i 2°C) e limitarne l'incremento (a 1,5°C).          
+
+## Dataset & Bibliografia  
+- [Temperature medie](https://www.kaggle.com/berkeleyearth/climate-change-earth-surface-temperature-data)
+- [Emissioni CO2 / Pro capite](http://www.globalcarbonatlas.org/en/CO2-emissions)
+- [Produzione energia](https://ourworldindata.org/grapher/electricity-prod-source-stacked?country=~FRA)
+
+- [Coal Phase-Out](https://en.wikipedia.org/wiki/Coal_phase-out)
+- [US e il Paris Agreement](https://www.whitehouse.gov/briefing-room/statements-releases/2021/04/22/fact-sheet-president-biden-sets-2030-greenhouse-gas-pollution-reduction-target-aimed-at-creating-good-paying-union-jobs-and-securing-u-s-leadership-on-clean-energy-technologies/)
+- [Accordo di Parigi](https://it.wikipedia.org/wiki/Accordo_di_Parigi_(2015))
