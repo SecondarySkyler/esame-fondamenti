@@ -71,7 +71,7 @@ global_temperature = global_temperature %>%
 
 
 # - Come sono cambiate le temperature medie della superficie terrestre nel corso degli anni?
-Il grafico rende possibile notare come l'accrescimento della temperatura media globale abbia preso piede verso la fine del 18esimo secolo.
+Il grafico rende possibile notare come l'accrescimento della temperatura media globale abbia preso piede verso la fine del XVIII secolo.
 L'aumento di circa 0,7°C registrato solo nel XX secolo sta causando attualmente importanti perdite di ghiaccio e il conseguente innalzamento del livello del mare.
 
  
@@ -284,8 +284,7 @@ ui <- fluidPage(
                          "Inghilterra" = "United Kingdom",
                          "Spagna" = "Spain",
                          "Stati Uniti" = "United States",
-                         "Cina" = "China",
-                         "India" = "India")
+                         "Cina" = "China")
         )),
         column(6, checkboxGroupInput(
           "energySelector",
@@ -308,7 +307,7 @@ ui <- fluidPage(
 server <- function(input, output) {
   output$o <- renderPlot({
     
-    state_filter <- c("France", "Australia", "Germany", "United Kingdom", "Spain", "United States", "China", "India")
+    state_filter <- c("France", "Australia", "Germany", "United Kingdom", "Spain", "United States", "China")
     myColors <- c("#2e2e2e", "#275fe3", "#4cade6", "#7f868a", "#089591", "#ffc233", "#03fc8c")
     
     electricity_prod %>%
@@ -353,7 +352,17 @@ Gli Stati Uniti, nel 2007, avevano in progetto la costruzione di circa 150 impia
 Nel 2012 questo numero calò a 15 impianti, in seguito alle nuove limitazioni sulle emissioni sottoscritte dai diversi stati della federazione.
 Come la maggior parte degli altri Paesi nel mondo, anche l'America si è posta l'obiettivo di diminuire del 50% le emissioni di anidride carbonica entro il 2030, per poi raggiungere le 0 emissioni entro il 2050, affermando inoltre l'intenzione di voler rientrare nel così detto "Accordo di Parigi".
 
-Esso è un patto stipulato tra gli Stati membri delle Nazioni Unite con il quale si vuole contenere l'aumento della temperatura media globale (sotto i 2°C) e limitarne l'incremento (a 1,5°C).          
+Esso è un patto stipulato tra gli Stati membri delle Nazioni Unite con il quale si vuole contenere l'aumento della temperatura media globale (sotto i 2°C) e limitarne l'incremento (a 1,5°C).  
+
+
+## Conclusioni
+
+* Dai dati analizzati sul cambiamento della temperatura ho ottenuto un riscontro diverso dalle mie aspettative.
+  Infatti, la mia attesa prevedeva un incremento maggiore rispetto alle temperature, in base ai vari periodi storici.
+  Dopo la ricerca dei dati ho potuto comprendere che, invece, queste abbiano una differenza minore e che per creare dei danni, e un conseguente squilibrio, nell'ecosistema
+  non sia necessario un cambiamento drastico, bensì minimo.
+* L'elevata emissione di CO2 è un problema, non solo per l'ambiente ma anche per noi stessi, e necessita di una soluzione tempestiva e decisa.
+  La nota positiva di tutto ciò è che la maggior parte dei paesi del mondo ha preso dei provvedimenti a riguardo.
 
 ## Dataset & Bibliografia  
 - [Temperature medie](https://www.kaggle.com/berkeleyearth/climate-change-earth-surface-temperature-data)

@@ -4,6 +4,7 @@ author: "Cristian Murtas, 150521"
 output:
   ioslides_presentation:
     css: style.css
+    incremental: yes
 ---
 
 ```{r setup, include=FALSE}
@@ -23,7 +24,7 @@ In particolare andremo a cercare una risposta alle seguenti domande:
 - Come sono cambiate le temperature medie della superficie terrestre nel corso degli anni?
 - Com'è cambiata l'emissione di CO2 nel corso degli anni?
 - Qual è la regione che emette più anidride carbonica? E come è cambiato l'andamento nel corso degli anni?
-- Come si riflette l'emissione di co2 sul livello pro capite?
+- Come si riflette l'emissione di CO2 sul livello pro capite?
 - Come viene prodotta l'elettricità nel mondo?
 
 
@@ -80,8 +81,7 @@ global_mean_temperature = global_temperature %>%
   summarize(LandAverageTemperatureByYear = mean(LandAverageTemperature)) %>%
   ggplot(aes(x = Year, y = LandAverageTemperatureByYear)) +
   geom_line(color = "gold1") +
-  labs(title = "Andamento annuale della temperatura",
-       subtitle = "1850 - 2015",
+  labs(subtitle = "1850 - 2015",
        y = "Temperatura Media (Celsius °C)",
        caption = "Source: Kaggle") +
   theme_minimal() +
@@ -142,7 +142,7 @@ fig
 
 
 ## Emissioni annuali di CO2 {.title}
-#### 1750 - 2019
+
 Come sono cambiate le medie annuali negli anni?
 
 ```{r, echo=FALSE, emissioni-annuali}
@@ -150,7 +150,7 @@ world_co2_emission = co2_emission %>%
   filter(Entity == "World") %>%
   ggplot(aes(x = Year, y = `Annual CO2 emissions`)) +
   geom_line(size = 1, color = "darkolivegreen2") + 
-  labs(
+  labs(subtitle = "1750 - 2019",
        y = "Emissioni annue di CO2 (tonnellate)",
        caption = "Source: Global Carbon Project") +
   scale_y_continuous(labels = scales::comma) +
@@ -251,8 +251,7 @@ ui <- fluidPage(
                          "Inghilterra" = "United Kingdom",
                          "Spagna" = "Spain",
                          "Stati Uniti" = "United States",
-                         "Cina" = "China",
-                         "India" = "India")
+                         "Cina" = "China")
         )),
         column(6, checkboxGroupInput(
           "energySelector",
@@ -275,7 +274,7 @@ ui <- fluidPage(
 server <- function(input, output) {
   output$o <- renderPlot({
     
-    state_filter <- c("France", "Australia", "Germany", "United Kingdom", "Spain", "United States", "China", "India")
+    state_filter <- c("France", "Australia", "Germany", "United Kingdom", "Spain", "United States", "China")
     myColors <- c("#2e2e2e", "#275fe3", "#4cade6", "#7f868a", "#089591", "#ffc233", "#03fc8c")
     
     electricity_prod %>%
@@ -308,6 +307,15 @@ server <- function(input, output) {
 
 shinyApp(ui, server)
 ```
+
+## Conclusioni
+
+* Dai dati analizzati sul cambiamento della temperatura ho ottenuto un riscontro diverso dalle mie aspettative.
+  Infatti, la mia attesa prevedeva un incremento maggiore rispetto alle temperature, in base ai vari periodi storici.
+  Dopo la ricerca dei dati ho potuto comprendere che, invece, queste abbiano una differenza minore e che per creare dei danni, e un conseguente squilibrio, nell'ecosistema
+  non sia necessario un cambiamento drastico, bensì minimo.
+* L'elevata emissione di CO2 è un problema, non solo per l'ambiente ma anche per noi stessi, e necessita di una soluzione tempestiva e decisa.
+  La nota positiva di tutto ciò è che la maggior parte dei paesi del mondo ha preso dei provvedimenti a riguardo.
 
 
 ## Dataset & Bibliografia  
